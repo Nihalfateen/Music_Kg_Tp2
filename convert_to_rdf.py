@@ -319,6 +319,15 @@ def build_ontology(g_ont: Graph) -> None:
                  RDFS.Resource, MUSIC.ReleaseEra)
     add_obj_prop(MUSIC.similarTo,   "similarTo",   "Symmetric artist-to-artist similarity based on audio-feature averages", MUSIC.Artist, MUSIC.Artist,
                  symmetric=True)
+    add_obj_prop(MUSIC.originPlace, "originPlace",
+                 "Links an artist or genre to an externally sourced origin or birth place",
+                 RDFS.Resource, RDFS.Resource)
+    add_obj_prop(MUSIC.officialWebsite, "officialWebsite",
+                 "Links an artist or genre to an official website discovered from linked data",
+                 RDFS.Resource, RDFS.Resource)
+    add_obj_prop(MUSIC.wikidataEntity, "wikidataEntity",
+                 "Links a local resource to its associated Wikidata entity",
+                 RDFS.Resource, RDFS.Resource)
 
     # sharedGenreWith (used in inference)
     g_ont.add((MUSIC.sharedGenreWith, RDF.type, OWL.ObjectProperty))
@@ -342,6 +351,9 @@ def build_ontology(g_ont: Graph) -> None:
     add_data_prop(MUSIC.durationMs,  "durationMs",  "Track duration in milliseconds", MUSIC.Track,          XSD.integer)
     add_data_prop(MUSIC.energyLevel, "energyLevel", "Derived low, medium, or high energy label", MUSIC.AudioProfile, XSD.string)
     add_data_prop(MUSIC.popularityLevel, "popularityLevel", "Derived low, medium, or high popularity label", MUSIC.Track, XSD.string)
+    add_data_prop(MUSIC.dbpediaAbstract, "dbpediaAbstract",
+                  "English DBpedia abstract or description imported during optional linked-data enrichment",
+                  RDFS.Resource, XSD.string)
 
     log.info(f"  Ontology triples: {len(g_ont):,}")
 

@@ -23,6 +23,7 @@ The final TP2 system must integrate:
 spotify_songs.csv
   -> convert_to_rdf.py
   -> music_kg_project/data/*.rdf|*.nt|*.ttl
+  -> music_kg_project/music_graph/linked_data.py (optional DBpedia enrichment)
   -> GraphDB repository when available
   -> rdflib fallback when GraphDB is unavailable
   -> Django REST API
@@ -47,6 +48,7 @@ Current responsibilities:
 - Build artist, album, track, genre, and audio-feature triples.
 - Build derived TP2 classification triples for audio profiles, energy, popularity, and release eras.
 - Add local DBpedia `owl:sameAs` URI links.
+- Add ontology properties used by optional linked-data enrichment.
 - Compute artist similarity relationships.
 - Add Python-based inferred triples.
 - Serialize RDF outputs.
@@ -58,7 +60,9 @@ music_kg_project/data/facts_only.nt
 music_kg_project/data/music_kg.nt
 music_kg_project/data/music_kg.rdf
 music_kg_project/data/music_kg_integrated.rdf
+music_kg_project/data/music_kg_enriched.ttl
 music_kg_project/data/ontology.ttl
+music_kg_project/data/enrichment.ttl
 music_kg_project/data/spin_rules.ttl
 music_kg_project/data/stats.json
 ```
@@ -68,8 +72,59 @@ Output meaning:
 - `facts_only.nt` contains data facts only from the artist, album, and track named graphs.
 - `ontology.ttl` contains ontology/schema triples only.
 - `music_kg_integrated.rdf` contains ontology plus facts in RDF/XML for Protégé.
+- `enrichment.ttl` contains optional DBpedia/Wikidata enrichment triples.
+- `music_kg_enriched.ttl` contains the integrated graph plus optional enrichment triples in Turtle.
 - `spin_rules.ttl` contains independent SPIN-compatible inference rules.
 - `music_kg.nt` and `music_kg.rdf` are preserved full-graph exports for existing behavior.
+
+### 3.1.1 Linked-Data Enrichment
+
+File:
+
+```text
+music_kg_project/music_graph/linked_data.py
+```
+
+Current status:
+
+- Done for Milestone 6.
+- Runs independently from Django startup and from the normal RDF generation command.
+- Reads local RDF from `facts_only.nt` or `music_kg_integrated.rdf`.
+- Uses existing local DBpedia `owl:sameAs` URIs to select a controlled subset of artists/genres.
+- Uses `SPARQLWrapper` to query DBpedia at `https://dbpedia.org/sparql`.
+- Adds available external metadata:
+  - `music:dbpediaAbstract`
+  - `music:originPlace`
+  - `music:officialWebsite`
+  - `music:wikidataEntity`
+  - additional Wikidata `owl:sameAs` links when DBpedia exposes them
+- Supports `--limit` and `--timeout`.
+- Handles endpoint/resource failures per resource and still writes a valid Turtle output.
+
+Usage:
+
+```bash
+.venv/bin/python music_kg_project/music_graph/linked_data.py --input music_kg_project/data/music_kg_integrated.rdf --output music_kg_project/data/enrichment.ttl --limit 20
+```
+
+Optional combined graph:
+
+```bash
+.venv/bin/python music_kg_project/music_graph/linked_data.py --input music_kg_project/data/music_kg_integrated.rdf --output music_kg_project/data/enrichment.ttl --limit 20 --enriched-output music_kg_project/data/music_kg_enriched.ttl
+```
+
+Latest result:
+
+```text
+Linked-data enrichment summary
+  candidates: 20
+  queried: 20
+  enriched resources: 9
+  triples added: 25
+  failures: 0
+  output: music_kg_project/data/enrichment.ttl
+  enriched graph: music_kg_project/data/music_kg_enriched.ttl
+```
 
 ### 3.2 Backend
 
@@ -133,7 +188,7 @@ music-kg
 Dependency status:
 
 - `requests` is included in `music_kg_project/requirements.txt` because `rdf_store.py` imports it.
-- `SPARQLWrapper` is included in both root and backend requirements for the later DBpedia/Wikidata enrichment milestone.
+- `SPARQLWrapper` is included in both root and backend requirements and is used by `music_kg_project/music_graph/linked_data.py` for DBpedia/Wikidata enrichment.
 
 ### 3.4 Frontend
 
@@ -480,43 +535,51 @@ Implemented rules:
 - Classify popular tracks.
 - Classify albums/tracks into broad release eras.
 
-## 9. DBpedia/Wikidata Integration Plan
+## 9. DBpedia/Wikidata Integration
 
 Current status:
 
 - DBpedia URIs are generated locally as `owl:sameAs`.
-- No real SPARQL endpoint call exists.
+- Done for Milestone 6.
+- `music_kg_project/music_graph/linked_data.py` performs real DBpedia SPARQL endpoint calls with `SPARQLWrapper`.
+- Enrichment remains optional and separate from app startup.
 
-Required dependency:
+Dependency:
 
 ```text
 SPARQLWrapper
 ```
 
-Recommended module:
+Module:
 
 ```text
 music_kg_project/music_graph/linked_data.py
 ```
 
-or:
+Implemented behavior:
 
-```text
-enrich_linked_data.py
-```
-
-Required behavior:
-
-- Query DBpedia and/or Wikidata programmatically.
-- Add external enrichment triples.
-- Store results in RDF.
+- Query DBpedia programmatically using existing local DBpedia `owl:sameAs` links.
+- Add external enrichment triples for DBpedia abstracts, origin/birth places, official websites, and associated Wikidata entities when available.
+- Store results in RDF Turtle.
+- Limit external requests by default with `--limit 20`.
+- Support request timeout with `--timeout`.
+- Skip missing fields and continue after per-resource endpoint failures.
 - Surface enrichment in API/UI.
 
-Possible enrichment outputs:
+Outputs:
 
 ```text
 music_kg_project/data/enrichment.ttl
 music_kg_project/data/music_kg_enriched.ttl
+```
+
+Latest network note:
+
+```text
+Initial sandboxed network attempt could not resolve dbpedia.org:
+<urlopen error [Errno 8] nodename nor servname provided, or not known>
+
+After explicit network approval, DBpedia enrichment completed successfully with 25 triples.
 ```
 
 ## 10. RDFa and Microformats Plan
@@ -574,6 +637,8 @@ facts_only.nt
 ontology.ttl
 music_kg_integrated.rdf
 spin_rules.ttl
+enrichment.ttl
+music_kg_enriched.ttl
 stats.json
 ```
 
@@ -584,6 +649,8 @@ facts_only.nt
 ontology.ttl
 music_kg_integrated.rdf
 spin_rules.ttl
+enrichment.ttl
+music_kg_enriched.ttl
 ```
 
 ### 11.2 RDF Parse Checks
@@ -597,8 +664,10 @@ Example:
 from rdflib import Graph
 for path, fmt in [
     ("music_kg_project/data/ontology.ttl", "turtle"),
+    ("music_kg_project/data/enrichment.ttl", "turtle"),
     ("music_kg_project/data/spin_rules.ttl", "turtle"),
     ("music_kg_project/data/music_kg_integrated.rdf", "xml"),
+    ("music_kg_project/data/music_kg_enriched.ttl", "turtle"),
 ]:
     g = Graph()
     g.parse(path, format=fmt)
@@ -609,9 +678,11 @@ PY
 Latest verification results:
 
 ```text
-music_kg_project/data/ontology.ttl: 173 triples
+music_kg_project/data/ontology.ttl: 193 triples
+music_kg_project/data/enrichment.ttl: 25 triples
 music_kg_project/data/spin_rules.ttl: 30 triples
-music_kg_project/data/music_kg_integrated.rdf: 761580 triples
+music_kg_project/data/music_kg_integrated.rdf: 761600 triples
+music_kg_project/data/music_kg_enriched.ttl: 761625 triples
 ```
 
 ### 11.3 Backend Checks

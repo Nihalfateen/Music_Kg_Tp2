@@ -98,7 +98,9 @@ music_kg/
   - `music_kg_project/data/music_kg.nt`
   - `music_kg_project/data/music_kg.rdf`
   - `music_kg_project/data/music_kg_integrated.rdf`
+  - `music_kg_project/data/music_kg_enriched.ttl`
   - `music_kg_project/data/ontology.ttl`
+  - `music_kg_project/data/enrichment.ttl`
   - `music_kg_project/data/spin_rules.ttl`
   - `music_kg_project/data/stats.json`
 - `facts_only.nt` is exported from the data named graphs only and excludes the ontology/schema graph.
@@ -132,6 +134,8 @@ music_kg/
 - Basic inference/classification triples are generated in Python inside `convert_to_rdf.py`.
 - SPIN-compatible inference rules are generated independently by `music_kg_project/music_graph/spin_rules.py`.
 - DBpedia `owl:sameAs` links are generated locally from artist/genre names.
+- Optional DBpedia/Wikidata enrichment is generated independently by `music_kg_project/music_graph/linked_data.py`.
+- Enrichment reads existing local DBpedia `owl:sameAs` links, queries DBpedia with `SPARQLWrapper`, and writes separate RDF enrichment triples so normal app startup is not dependent on live external endpoints.
 
 ## 4. TP2 Required Scope
 
@@ -162,7 +166,7 @@ Current status:
 
 - Partial. `rdf_store.py` contains GraphDB connection and fallback logic.
 - `requests` is now included in `music_kg_project/requirements.txt`.
-- `SPARQLWrapper` is now included in both root and backend requirements for later enrichment work.
+- `SPARQLWrapper` is now included in both root and backend requirements and is used by the optional DBpedia/Wikidata enrichment module.
 
 Required improvements:
 
@@ -206,15 +210,19 @@ Required files:
 
 Current status:
 
-- Done for Milestone 2 and updated for Milestone 4/5.
+- Done for Milestone 2 and updated for Milestone 4/5/6.
 - `facts_only.nt` is generated as data-only N-Triples, excluding ontology/schema triples from the ontology named graph.
 - `music_kg_integrated.rdf` is generated as ontology plus facts in RDF/XML for Protégé.
 - Existing outputs `music_kg.nt`, `music_kg.rdf`, `ontology.ttl`, and `stats.json` are preserved.
 - `spin_rules.ttl` is generated as SPIN-compatible Turtle.
+- `enrichment.ttl` is generated as optional DBpedia/Wikidata enrichment Turtle.
+- `music_kg_enriched.ttl` can be generated as optional integrated graph plus enrichment Turtle.
 - Latest parse verification:
-  - `ontology.ttl`: 173 triples
+  - `ontology.ttl`: 193 triples
+  - `enrichment.ttl`: 25 triples
   - `spin_rules.ttl`: 30 triples
-  - `music_kg_integrated.rdf`: 761580 triples
+  - `music_kg_integrated.rdf`: 761600 triples
+  - `music_kg_enriched.ttl`: 761625 triples
 
 ### 4.5 SPIN Inference Rules
 
@@ -248,16 +256,19 @@ The assignment requires programmatic access to DBpedia and/or Wikidata SPARQL en
 
 Current status:
 
-- Partial. DBpedia links are generated locally, but no endpoint access exists.
-- `SPARQLWrapper` is now present in requirements, but live endpoint enrichment is not implemented yet.
+- Done for Milestone 6.
+- DBpedia links are generated locally as `owl:sameAs`.
+- `music_kg_project/music_graph/linked_data.py` uses `SPARQLWrapper` to query DBpedia programmatically.
+- The enrichment module reads a controlled subset of artist/genre resources, defaults to `--limit 20`, handles endpoint/resource failures gracefully, supports request timeouts, and writes `music_kg_project/data/enrichment.ttl`.
+- The module can also generate `music_kg_project/data/music_kg_enriched.ttl` with the integrated graph plus enrichment triples.
+- Latest live DBpedia run enriched 9 of 20 queried candidates with 25 triples and 0 failures after network access was approved.
 
 Required improvements:
 
-- Create an enrichment module, for example:
-  - `music_kg_project/music_graph/linked_data.py`
-  - or `enrich_linked_data.py`
-- Query DBpedia and/or Wikidata for artist/genre metadata.
-- Store enrichment triples in RDF.
+- Done: create enrichment module `music_kg_project/music_graph/linked_data.py`.
+- Done: query DBpedia for artist/genre metadata using `SPARQLWrapper`.
+- Done: store enrichment triples in RDF.
+- Done: add ontology properties for `music:dbpediaAbstract`, `music:originPlace`, `music:officialWebsite`, and `music:wikidataEntity`.
 - Surface enrichment data in the UI where useful.
 
 Candidate enrichment fields:
@@ -360,17 +371,17 @@ Recommended file:
 | Python/Django app | Done | `music_kg_project/` exists with API views/routes. |
 | React UI | Done | `music-kg-frontend/` exists with multiple routed pages. |
 | RDF data | Done | `music_kg.nt`, `music_kg.rdf`, `facts_only.nt`, and `music_kg_integrated.rdf` exist. |
-| RDFS/OWL ontology | Done | `ontology.ttl` includes expanded TP2 classes/properties and 173 parsed triples. |
+| RDFS/OWL ontology | Done | `ontology.ttl` includes expanded TP2 classes/properties and 193 parsed triples. |
 | SPARQL SELECT | Done | `/api/sparql/` exists. |
 | SPARQL UPDATE | Done/Partial | `/api/sparql/update/` exists; needs documentation/control. |
 | GraphDB | Partial | Code exists in `rdf_store.py`; `requests` dependency added; docs/testing still needed. |
 | Protégé workflow | Partial | Integrated RDF/XML file exists; manual Protégé validation still needed. |
 | Facts-only RDF file | Done | `facts_only.nt` is regenerated and excludes ontology schema triples. |
-| Integrated ontology+facts file | Done | `music_kg_integrated.rdf` generated with 761580 triples. |
+| Integrated ontology+facts file | Done | `music_kg_integrated.rdf` generated with 761600 triples. |
 | SPIN rules | Done | `spin_rules.py` generates `spin_rules.ttl` with 30 parsed triples. |
-| SPARQLWrapper | Partial | Dependency added; enrichment code still missing. |
-| DBpedia integration | Partial | `owl:sameAs` generated locally; no endpoint query. |
-| Wikidata integration | Missing | No evidence in code. |
+| SPARQLWrapper | Done | `linked_data.py` uses `SPARQLWrapper` for live DBpedia enrichment. |
+| DBpedia integration | Done | Local DBpedia `owl:sameAs` links are queried through DBpedia SPARQL; `enrichment.ttl` has 25 parsed triples. |
+| Wikidata integration | Done/Partial | DBpedia `owl:sameAs` results add associated Wikidata entity URIs via `music:wikidataEntity`; no direct Wikidata endpoint query yet. |
 | RDFa/microformats | Missing | No semantic markup in React pages. |
 | TP2 report | Missing | No report file. |
 | TP2 checklist | Done | `tp2_checklist.md` documents status, generated files, regeneration, and parse checks. |
@@ -445,9 +456,12 @@ Goal: expand data using external SPARQL endpoints.
 
 Tasks:
 
-- Add `SPARQLWrapper`.
-- Query DBpedia and/or Wikidata.
-- Generate enrichment triples.
+- Done: `SPARQLWrapper` dependency is available.
+- Done: created `music_kg_project/music_graph/linked_data.py`.
+- Done: query DBpedia using existing local DBpedia `owl:sameAs` URIs.
+- Done: generate `music_kg_project/data/enrichment.ttl`.
+- Done: optionally generate `music_kg_project/data/music_kg_enriched.ttl`.
+- Done: document usage and verification in `tp2_checklist.md`.
 - Include external URIs and metadata in artist/genre pages.
 
 ### Milestone 7: RDFa and Microformats

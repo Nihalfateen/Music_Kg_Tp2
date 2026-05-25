@@ -64,6 +64,12 @@ music:danceability a owl:DatatypeProperty ;
     rdfs:domain music:AudioFeatures ;
     rdfs:range xsd:float .
 
+music:dbpediaAbstract a owl:DatatypeProperty ;
+    rdfs:label "dbpediaAbstract" ;
+    rdfs:comment "English DBpedia abstract or description imported during optional linked-data enrichment" ;
+    rdfs:domain rdfs:Resource ;
+    rdfs:range xsd:string .
+
 music:durationMs a owl:DatatypeProperty ;
     rdfs:label "durationMs" ;
     rdfs:comment "Track duration in milliseconds" ;
@@ -118,6 +124,18 @@ music:loudness a owl:DatatypeProperty ;
     rdfs:domain music:AudioFeatures ;
     rdfs:range xsd:float .
 
+music:officialWebsite a owl:ObjectProperty ;
+    rdfs:label "officialWebsite" ;
+    rdfs:comment "Links an artist or genre to an official website discovered from linked data" ;
+    rdfs:domain rdfs:Resource ;
+    rdfs:range rdfs:Resource .
+
+music:originPlace a owl:ObjectProperty ;
+    rdfs:label "originPlace" ;
+    rdfs:comment "Links an artist or genre to an externally sourced origin or birth place" ;
+    rdfs:domain rdfs:Resource ;
+    rdfs:range rdfs:Resource .
+
 music:popularity a owl:DatatypeProperty ;
     rdfs:label "popularity" ;
     rdfs:comment "Spotify track popularity score from 0 to 100" ;
@@ -167,6 +185,12 @@ music:valence a owl:DatatypeProperty ;
     rdfs:comment "Spotify valence score in the range 0 to 1" ;
     rdfs:domain music:AudioFeatures ;
     rdfs:range xsd:float .
+
+music:wikidataEntity a owl:ObjectProperty ;
+    rdfs:label "wikidataEntity" ;
+    rdfs:comment "Links a local resource to its associated Wikidata entity" ;
+    rdfs:domain rdfs:Resource ;
+    rdfs:range rdfs:Resource .
 
 music:Genre a owl:Class ;
     rdfs:label "Genre" ;
