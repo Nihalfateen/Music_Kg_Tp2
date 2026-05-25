@@ -5,6 +5,8 @@ from django.urls import path, re_path
 from music_graph import views
 
 urlpatterns = [
+    path('', views.api_home, name='api-root'),
+
     path('artists/create/', views.ArtistCreateView.as_view(), name='api_create_artist'),
     path('songs/bulk-create/', views.SongBulkCreateView.as_view(), name='api_create_songs_bulk'),
     path('tracks/update-album/', views.TrackAlbumUpdateView.as_view(), name='update_album_view'),

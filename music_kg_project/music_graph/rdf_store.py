@@ -55,6 +55,14 @@ class _RDFStore:
     def using_graphdb(self) -> bool:
         return self._use_graphdb
 
+    @property
+    def graph(self):
+        """
+        Public read-only access to the rdflib graph used in fallback mode.
+        Kept for endpoint metadata such as local triple counts.
+        """
+        return self._graph
+
     def load(self, nt_path: Path, stats_path: Path) -> None:
         """
         Called once from AppConfig.ready().

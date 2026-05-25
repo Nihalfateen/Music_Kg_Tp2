@@ -8,6 +8,10 @@ import AudioFeatureBar from '../components/common/AudioFeatureBar'
 import { PageSkeleton } from '../components/common/LoadingSkeleton'
 import { formatMs } from '../utils/helpers'
 
+const semanticResourceProps = (uri) => (
+  uri ? { resource: uri, itemID: uri } : {}
+)
+
 export default function AlbumDetailPage() {
   const { slug } = useParams()
   const [album, setAlbum]   = useState(null)
@@ -47,7 +51,13 @@ export default function AlbumDetailPage() {
   )
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8">
+    <div className="max-w-4xl mx-auto px-6 py-8"
+      vocab="https://schema.org/"
+      typeof="MusicAlbum"
+      itemScope
+      itemType="https://schema.org/MusicAlbum"
+      {...semanticResourceProps(album.uri)}
+    >
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
 
         {/* Header Section */}
@@ -55,10 +65,18 @@ export default function AlbumDetailPage() {
           <div className="w-20 h-20 rounded-card bg-bg-hover flex items-center justify-center text-4xl shrink-0">💿</div>
 
           <div>
-            <h1 className="text-3xl font-extrabold text-text-primary mb-1">{album.name}</h1>
+            <h1 className="text-3xl font-extrabold text-text-primary mb-1"
+              property="name"
+              itemProp="name"
+            >{album.name}</h1>
             <Link to={`/artist/${album.artist_slug}`}
+              property="byArtist"
+              typeof="MusicGroup"
+              itemScope
+              itemType="https://schema.org/MusicGroup"
+              itemProp="byArtist"
               className="text-accent hover:text-accent-hover transition-colors text-sm font-medium">
-              {album.artist_name}
+              <span property="name" itemProp="name">{album.artist_name}</span>
             </Link>
             <div className="flex items-center gap-2 mt-1">
               {isEditingYear ? (
@@ -75,7 +93,11 @@ export default function AlbumDetailPage() {
                 </div>
               ) : (
                 <p className="group text-xs text-text-muted flex items-center gap-2">
-                  <span>{album.year} · {album.track_count} tracks</span>
+                  <span>
+                    <span property="datePublished" itemProp="datePublished">{album.year}</span>
+                    {' · '}
+                    {album.track_count} tracks
+                  </span>
                   <button
                     onClick={() => { setTempYear(album.year); setIsEditingYear(true); }}
                     className="opacity-0 group-hover:opacity-100 transition-opacity text-accent text-[10px]"
@@ -100,11 +122,20 @@ export default function AlbumDetailPage() {
                 <motion.div key={t.uri || i}
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}
                   className="p-4 hover:bg-bg-hover transition-colors"
+                  typeof="MusicRecording"
+                  property="track"
+                  itemScope
+                  itemType="https://schema.org/MusicRecording"
+                  itemProp="track"
+                  {...semanticResourceProps(t.uri)}
                 >
                   <div className="flex items-center gap-4 mb-2">
                     <span className="text-sm text-text-muted w-6 shrink-0">{i + 1}</span>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm text-text-primary truncate">{t.name}</p>
+                      <p className="font-semibold text-sm text-text-primary truncate"
+                        property="name"
+                        itemProp="name"
+                      >{t.name}</p>
                     </div>
                     <span className="text-xs text-text-muted shrink-0">{formatMs(t.duration_ms)}</span>
                     <div className="flex items-center gap-1 shrink-0">

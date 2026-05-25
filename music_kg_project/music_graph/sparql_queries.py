@@ -60,44 +60,65 @@ def _album_uri_from_slug(slug: str) -> str:
 
 def get_artists(search=None, genre=None, limit=500, offset=0) -> List[Dict]:
     """
-     Queries GraphDB for artists, supporting genre and name filters.
-     """
+    Queries GraphDB/rdflib for artists, supporting genre and name filters.
+    """
     limit_val = int(limit) if limit else 500
+    offset_val = int(offset) if offset else 0
+
+    filters = []
+    if search:
+        safe_search = str(search).replace("\\", "\\\\").replace('"', '\\"')
+        filters.append(f'FILTER(CONTAINS(LCASE(STR(?name)), LCASE("{safe_search}")))')
+    if genre:
+        safe_genre = str(genre).replace("\\", "\\\\").replace('"', '\\"')
+        filters.append("""
+        ?uri music:performs ?genreTrack .
+        ?genreTrack music:inGenre ?genreNode .
+        OPTIONAL { ?genreNode rdfs:label ?genreLabel }
+        BIND(IF(BOUND(?genreLabel), ?genreLabel, REPLACE(STR(?genreNode), "^.*[/#]", "")) AS ?filterGenre)
+        """)
+        filters.append(f'FILTER(LCASE(STR(?filterGenre)) = LCASE("{safe_genre}"))')
+
+    filter_block = "\n        ".join(filters)
 
     query = _PREFIXES + f"""
-    SELECT ?uri 
-           (SAMPLE(?nameVal) AS ?name) 
-           (SAMPLE(?slugVal) AS ?slug) 
-           (GROUP_CONCAT(DISTINCT ?gLabel; SEPARATOR=",") AS ?genreList)
+    SELECT DISTINCT ?uri ?name ?slug
     WHERE {{
-        ?uri a music:Artist .
-
-        OPTIONAL {{ ?uri music:artistName ?n1 }}
-        OPTIONAL {{ ?uri rdfs:label ?n2 }}
-        BIND(COALESCE(?n1, ?n2, REPLACE(STR(?uri), "^.*[/#]", "")) AS ?nameVal)
-
-        OPTIONAL {{ ?uri music:slug ?s1 }}
-        BIND(COALESCE(?s1, REPLACE(STR(?uri), "^.*[/#]", "")) AS ?slugVal)
-
-        OPTIONAL {{
-            ?uri music:performs ?track .
-            ?track (music:inGenre|schema:genre) ?gen .
-            OPTIONAL {{ ?gen (rdfs:label|schema:name) ?lab }}
-            BIND(COALESCE(?lab, REPLACE(STR(?gen), "^.*[/#]", "")) AS ?gLabel)
-        }}
+        ?uri a music:Artist ;
+             music:artistName ?name .
+        BIND(REPLACE(STR(?uri), "^.*[/#]", "") AS ?slug)
+        {filter_block}
     }}
-    GROUP BY ?uri
+    ORDER BY LCASE(STR(?name))
     LIMIT {limit_val}
+    OFFSET {offset_val}
     """
 
     rows = store.execute_sparql(query)
     results = []
+    genres_by_uri = {}
+    if rows:
+        values = " ".join(f"<{r['uri']}>" for r in rows if r.get("uri"))
+        genre_query = _PREFIXES + f"""
+        SELECT ?uri (GROUP_CONCAT(DISTINCT ?gLabel; SEPARATOR=",") AS ?genreList)
+        WHERE {{
+            VALUES ?uri {{ {values} }}
+            ?uri music:performs ?track .
+            ?track music:inGenre ?gen .
+            OPTIONAL {{ ?gen rdfs:label ?lab }}
+            BIND(IF(BOUND(?lab), ?lab, REPLACE(STR(?gen), "^.*[/#]", "")) AS ?gLabel)
+        }}
+        GROUP BY ?uri
+        """
+        for genre_row in store.execute_sparql(genre_query):
+            genres_by_uri[str(genre_row.get("uri"))] = str(genre_row.get("genreList", ""))
+
     for r in rows:
         uri_str = str(r["uri"])
         name = str(r.get("name") or uri_str.split("/")[-1])
         slug = str(r.get("slug") or uri_str.split("/")[-1])
 
-        genre_list = [g.strip().lower() for g in str(r.get("genreList", "")).split(",") if g.strip()]
+        genre_list = [g.strip().lower() for g in genres_by_uri.get(uri_str, "").split(",") if g.strip()]
 
         results.append({
             "uri": uri_str,
@@ -784,18 +805,14 @@ def _make_histogram(values, min_val, max_val, n_buckets):
 
 def get_similarity_edges(limit=2000) -> List[Dict]:
     """
-    Finds artists who share a genre.
+    Returns artist similarity edges already materialized in RDF.
     Generates slugs from URIs to ensure connections work even if music:slug is missing.
     """
     query = _PREFIXES + f"""
     SELECT DISTINCT ?sSlug ?tSlug WHERE {{
-        ?s1 a music:Artist ; (music:inGenre|schema:genre) ?g .
-        ?s2 a music:Artist ; (music:inGenre|schema:genre) ?g .
-
+        ?s1 music:similarTo ?s2 .
         BIND(REPLACE(STR(?s1), "^.*[/#]", "") AS ?sSlug)
         BIND(REPLACE(STR(?s2), "^.*[/#]", "") AS ?tSlug)
-
-        FILTER(?sSlug < ?tSlug)
     }} LIMIT {int(limit)}
     """
     rows = store.execute_sparql(query)

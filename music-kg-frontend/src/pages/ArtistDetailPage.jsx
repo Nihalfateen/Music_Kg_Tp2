@@ -14,6 +14,10 @@ import { hashColor, formatMs } from '../utils/helpers'
 
 import AddSongsModal from "../components/modals/AddSongsModal.jsx";
 
+const semanticResourceProps = (uri) => (
+  uri ? { resource: uri, itemID: uri } : {}
+)
+
 // Sortable tracks table
 function SortableTable({ tracks, onEdit, onDelete }) {
   const [sortKey, setSortKey] = useState('popularity')
@@ -58,13 +62,33 @@ function SortableTable({ tracks, onEdit, onDelete }) {
           {sorted.map((t, i) => {
             const af = t.audio_features || {}
             return (
-              <tr key={t.uri || i} className="border-b border-border-col/40 hover:bg-bg-hover transition-colors">
+              <tr key={t.uri || i}
+                className="border-b border-border-col/40 hover:bg-bg-hover transition-colors"
+                typeof="MusicRecording"
+                property="track"
+                itemScope
+                itemType="https://schema.org/MusicRecording"
+                itemProp="track"
+                {...semanticResourceProps(t.uri)}
+              >
                 <td className="py-2.5 text-sm text-text-muted">{i + 1}</td>
-                <td className="py-2.5 text-sm font-medium text-text-primary max-w-xs truncate pr-4">{t.name}</td>
+                <td className="py-2.5 text-sm font-medium text-text-primary max-w-xs truncate pr-4"
+                  property="name"
+                  itemProp="name"
+                >{t.name}</td>
 
                 <td className="py-2.5 text-xs text-text-secondary truncate max-w-[150px]">
-                  <span className={t.album_name === 'Single' ? 'italic opacity-50' : ''}>
+                  <span className={t.album_name === 'Single' ? 'italic opacity-50' : ''}
+                    typeof="MusicAlbum"
+                    property="inAlbum"
+                    itemScope
+                    itemType="https://schema.org/MusicAlbum"
+                    itemProp="inAlbum"
+                    {...semanticResourceProps(t.album_uri)}
+                  >
+                    <span property="name" itemProp="name">
                     {t.album_name}
+                    </span>
                   </span>
                 </td>
 
@@ -105,7 +129,14 @@ function AlbumCard({ album }) {
   const [open, setOpen] = useState(false)
 
   return (
-    <div className="border border-border-col rounded-card overflow-hidden">
+    <div className="border border-border-col rounded-card overflow-hidden"
+      typeof="MusicAlbum"
+      property="album"
+      itemScope
+      itemType="https://schema.org/MusicAlbum"
+      itemProp="album"
+      {...semanticResourceProps(album.uri)}
+    >
       <button
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center gap-3 p-4 hover:bg-bg-hover transition-colors text-left"
@@ -114,9 +145,12 @@ function AlbumCard({ album }) {
           💿
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm text-text-primary truncate">{album.name}</p>
+          <p className="font-semibold text-sm text-text-primary truncate"
+            property="name"
+            itemProp="name"
+          >{album.name}</p>
           <p className="text-xs text-text-muted">
-            {album.year && <span>{album.year} · </span>}
+            {album.year && <span property="datePublished" itemProp="datePublished">{album.year} · </span>}
             <span>{album.tracks?.length || album.track_count || 0} tracks</span>
           </p>
         </div>
@@ -139,10 +173,21 @@ function AlbumCard({ album }) {
               {album.tracks.map((t, i) => {
                 const af = t.audio_features || {}
                 return (
-                  <div key={t.uri || i} className="flex items-center gap-3 px-4 py-2.5 hover:bg-bg-hover transition-colors">
+                  <div key={t.uri || i}
+                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-bg-hover transition-colors"
+                    typeof="MusicRecording"
+                    property="track"
+                    itemScope
+                    itemType="https://schema.org/MusicRecording"
+                    itemProp="track"
+                    {...semanticResourceProps(t.uri)}
+                  >
                     <span className="text-xs text-text-muted w-5 shrink-0">{i + 1}</span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-text-primary truncate">{t.name}</p>
+                      <p className="text-sm text-text-primary truncate"
+                        property="name"
+                        itemProp="name"
+                      >{t.name}</p>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       {af.energy != null && (
@@ -276,7 +321,13 @@ export default function ArtistDetailPage() {
   }))
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-8">
+    <div className="max-w-6xl mx-auto px-6 py-8"
+      vocab="https://schema.org/"
+      typeof="MusicGroup"
+      itemScope
+      itemType="https://schema.org/MusicGroup"
+      {...semanticResourceProps(artist.uri)}
+    >
 
       {/* Header */}
       <motion.div className="mb-10"
@@ -287,11 +338,16 @@ export default function ArtistDetailPage() {
             <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl shrink-0"
               style={{ background: accentColor + '33' }}>🎤</div>
             <div className="flex-1 min-w-0">
-              <h1 className="text-4xl font-extrabold text-text-primary mb-3">{artist.name}</h1>
+              <h1 className="text-4xl font-extrabold text-text-primary mb-3"
+                property="name"
+                itemProp="name"
+              >{artist.name}</h1>
               <div className="flex flex-wrap gap-2 mb-4">
                 {artist.genres?.map(g => (
                   <Link key={g} to={`/search?genre=${encodeURIComponent(g)}`}
                     className="px-3 py-1 rounded-pill text-xs font-semibold"
+                    property="genre"
+                    itemProp="genre"
                     style={{ background: hashColor(g) + '33', color: hashColor(g) }}>
                     {g}
                   </Link>
@@ -304,6 +360,8 @@ export default function ArtistDetailPage() {
                 {artist.similar_artists?.length > 0 && <span>🔗 {artist.similar_artists.length} similar</span>}
                 {artist.dbpedia_uri && (
                   <a href={artist.dbpedia_uri} target="_blank" rel="noreferrer"
+                    property="sameAs"
+                    itemProp="sameAs"
                     className="text-accent hover:text-accent-hover transition-colors flex items-center gap-1">
                     DBpedia ↗
                   </a>
