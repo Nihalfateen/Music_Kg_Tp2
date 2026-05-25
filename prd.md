@@ -99,6 +99,7 @@ music_kg/
   - `music_kg_project/data/music_kg.rdf`
   - `music_kg_project/data/music_kg_integrated.rdf`
   - `music_kg_project/data/ontology.ttl`
+  - `music_kg_project/data/spin_rules.ttl`
   - `music_kg_project/data/stats.json`
 - `facts_only.nt` is exported from the data named graphs only and excludes the ontology/schema graph.
 - `music_kg_integrated.rdf` is exported as ontology plus facts for Protégé validation.
@@ -108,6 +109,13 @@ music_kg/
   - `music:Track`
   - `music:Genre`
   - `music:AudioFeatures`
+- Ontology now includes TP2 classification classes:
+  - `music:AudioProfile`
+  - `music:HighEnergyTrack`
+  - `music:PopularTrack`
+  - `music:ReleaseEra`
+  - `music:ModernTrack`
+  - `music:ClassicTrack`
 - Ontology includes object/data properties such as:
   - `music:hasAlbum`
   - `music:hasTrack`
@@ -115,9 +123,14 @@ music_kg/
   - `music:performs`
   - `music:inGenre`
   - `music:hasAudioFeatures`
+  - `music:hasAudioProfile`
+  - `music:belongsToEra`
+  - `music:energyLevel`
+  - `music:popularityLevel`
   - `music:similarTo`
   - `music:sharedGenreWith`
-- Basic inference is implemented in Python inside `convert_to_rdf.py`.
+- Basic inference/classification triples are generated in Python inside `convert_to_rdf.py`.
+- SPIN-compatible inference rules are generated independently by `music_kg_project/music_graph/spin_rules.py`.
 - DBpedia `owl:sameAs` links are generated locally from artist/genre names.
 
 ## 4. TP2 Required Scope
@@ -130,15 +143,15 @@ The project must include an RDFS/OWL ontology that thoroughly describes the musi
 
 Required improvements:
 
-- Expand the ontology beyond the current simple classes.
-- Add classifications such as audio profile classes, popularity classes, release-era classes, or genre-based groupings.
-- Add useful OWL/RDFS constraints where appropriate:
+- Done: expand the ontology beyond the current simple classes.
+- Done: add classifications for audio profiles, popularity, energy, and release eras.
+- Done: add useful OWL/RDFS constraints where appropriate:
   - subclass relationships
   - inverse properties
   - symmetric properties
   - domain/range declarations
   - labels/comments
-- Keep `ontology.ttl` as the ontology-only file.
+- Done: keep `ontology.ttl` as the ontology-only file.
 - Ensure the ontology can be opened and validated in Protégé.
 
 ### 4.2 GraphDB
@@ -193,14 +206,15 @@ Required files:
 
 Current status:
 
-- Done for Milestone 2.
+- Done for Milestone 2 and updated for Milestone 4/5.
 - `facts_only.nt` is generated as data-only N-Triples, excluding ontology/schema triples from the ontology named graph.
 - `music_kg_integrated.rdf` is generated as ontology plus facts in RDF/XML for Protégé.
 - Existing outputs `music_kg.nt`, `music_kg.rdf`, `ontology.ttl`, and `stats.json` are preserved.
+- `spin_rules.ttl` is generated as SPIN-compatible Turtle.
 - Latest parse verification:
-  - `ontology.ttl`: 101 triples
-  - `facts_only.nt`: 569607 triples
-  - `music_kg_integrated.rdf`: 569708 triples
+  - `ontology.ttl`: 173 triples
+  - `spin_rules.ttl`: 30 triples
+  - `music_kg_integrated.rdf`: 761580 triples
 
 ### 4.5 SPIN Inference Rules
 
@@ -208,26 +222,25 @@ The assignment requires inference rules in SPIN, defined in a separate independe
 
 Current status:
 
-- Missing. Current inference is Python logic in `convert_to_rdf.py`, not SPIN.
+- Done for Milestone 5.
+- `music_kg_project/music_graph/spin_rules.py` generates independent SPIN-compatible rules.
+- `music_kg_project/data/spin_rules.ttl` contains explicitly identifiable rule resources.
+- Python-generated inference/classification triples remain in `convert_to_rdf.py` so the deliverable RDF data already contains practical classifications.
 
 Required improvements:
 
-- Create a separate module such as:
-  - `music_kg_project/music_graph/spin_rules.py`
-  - or `spin_rules.py` at project root.
-- Define SPIN-compatible rules for inferred relationships/classifications.
-- Export SPIN rules to a clear RDF/Turtle file, for example:
-  - `music_kg_project/data/spin_rules.ttl`
-- The rules should be explicitly identifiable for assessment.
+- Done: create separate module `music_kg_project/music_graph/spin_rules.py`.
+- Done: define SPIN-compatible rules for inferred relationships/classifications.
+- Done: export SPIN rules to `music_kg_project/data/spin_rules.ttl`.
+- Done: rules are explicitly identifiable for assessment.
 
-Candidate rules:
+Implemented rules:
 
 - Artist plus album plus track implies `music:performs`.
 - Artist similarity symmetry for `music:similarTo`.
-- Tracks in the same genre imply `music:sharedGenreWith`.
 - Tracks with high energy imply `music:HighEnergyTrack`.
 - Tracks with high popularity imply `music:PopularTrack`.
-- Albums released within a decade imply decade classification.
+- Albums/tracks are classified into broad release eras.
 
 ### 4.6 DBpedia/Wikidata Enrichment
 
@@ -347,14 +360,14 @@ Recommended file:
 | Python/Django app | Done | `music_kg_project/` exists with API views/routes. |
 | React UI | Done | `music-kg-frontend/` exists with multiple routed pages. |
 | RDF data | Done | `music_kg.nt`, `music_kg.rdf`, `facts_only.nt`, and `music_kg_integrated.rdf` exist. |
-| RDFS/OWL ontology | Partial | `ontology.ttl` exists but needs expansion. |
+| RDFS/OWL ontology | Done | `ontology.ttl` includes expanded TP2 classes/properties and 173 parsed triples. |
 | SPARQL SELECT | Done | `/api/sparql/` exists. |
 | SPARQL UPDATE | Done/Partial | `/api/sparql/update/` exists; needs documentation/control. |
 | GraphDB | Partial | Code exists in `rdf_store.py`; `requests` dependency added; docs/testing still needed. |
 | Protégé workflow | Partial | Integrated RDF/XML file exists; manual Protégé validation still needed. |
-| Facts-only RDF file | Done | `facts_only.nt` generated with 569607 triples and no ontology schema triples. |
-| Integrated ontology+facts file | Done | `music_kg_integrated.rdf` generated with 569708 triples. |
-| SPIN rules | Missing | Current inference is Python, not SPIN. |
+| Facts-only RDF file | Done | `facts_only.nt` is regenerated and excludes ontology schema triples. |
+| Integrated ontology+facts file | Done | `music_kg_integrated.rdf` generated with 761580 triples. |
+| SPIN rules | Done | `spin_rules.py` generates `spin_rules.ttl` with 30 parsed triples. |
 | SPARQLWrapper | Partial | Dependency added; enrichment code still missing. |
 | DBpedia integration | Partial | `owl:sameAs` generated locally; no endpoint query. |
 | Wikidata integration | Missing | No evidence in code. |
@@ -409,8 +422,9 @@ Goal: improve the ontology and validate it in Protégé.
 
 Tasks:
 
-- Add richer classes/properties/classifications.
-- Add labels and comments.
+- Done: added richer classes/properties/classifications.
+- Done: added labels, comments, subclass relationships, domains/ranges, inverse properties, and symmetric property declarations.
+- Done: regenerated `ontology.ttl` and integrated RDF/XML with high-energy, popular, modern/classic, and release-era classifications.
 - Open and validate ontology/integrated graph in Protégé.
 - Document validation steps.
 
@@ -420,10 +434,10 @@ Goal: implement required inference rules as SPIN in an independent module.
 
 Tasks:
 
-- Create SPIN module.
-- Export `spin_rules.ttl`.
-- Link rules to ontology/classes where applicable.
-- Demonstrate inferred relationships/classifications in app or SPARQL queries.
+- Done: created `music_kg_project/music_graph/spin_rules.py`.
+- Done: exported `music_kg_project/data/spin_rules.ttl`.
+- Done: linked rules to ontology classes with `spin:rule`.
+- Done: included identifiable rules for `music:performs`, symmetric `music:similarTo`, `music:HighEnergyTrack`, `music:PopularTrack`, and release-era classification.
 
 ### Milestone 6: DBpedia/Wikidata Enrichment
 

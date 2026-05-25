@@ -78,6 +78,34 @@ def audio_uri(track_id: str) -> URIRef:
     return BASE[f"audio/{safe_uri_part(track_id)}"]
 
 
+def release_era_uri(label: str) -> URIRef:
+    return BASE[f"era/{safe_uri_part(label)}"]
+
+
+def energy_level(value: float) -> str:
+    if value >= 0.75:
+        return "High"
+    if value >= 0.45:
+        return "Medium"
+    return "Low"
+
+
+def popularity_level(value: int) -> str:
+    if value >= 70:
+        return "High"
+    if value >= 40:
+        return "Medium"
+    return "Low"
+
+
+def release_era_for_year(year: int) -> tuple[str, URIRef]:
+    if year >= 2010:
+        return "Modern Era", release_era_uri("Modern Era")
+    if year < 2000:
+        return "Classic Era", release_era_uri("Classic Era")
+    return "Transition Era", release_era_uri("Transition Era")
+
+
 # ─────────────────────────────────────────────
 # STEP 1 — Data Cleaning
 # ─────────────────────────────────────────────
@@ -185,9 +213,10 @@ def build_ontology(g_ont: Graph) -> None:
         if disjoint_with:
             g_ont.add((cls, OWL.disjointWith, disjoint_with))
 
-    def add_obj_prop(prop, label, domain, range_, inverse_of=None, symmetric=False):
+    def add_obj_prop(prop, label, comment, domain, range_, inverse_of=None, symmetric=False):
         g_ont.add((prop, RDF.type, OWL.ObjectProperty))
         g_ont.add((prop, RDFS.label, Literal(label)))
+        g_ont.add((prop, RDFS.comment, Literal(comment)))
         g_ont.add((prop, RDFS.domain, domain))
         g_ont.add((prop, RDFS.range, range_))
         if inverse_of:
@@ -195,9 +224,10 @@ def build_ontology(g_ont: Graph) -> None:
         if symmetric:
             g_ont.add((prop, RDF.type, OWL.SymmetricProperty))
 
-    def add_data_prop(prop, label, domain, range_):
+    def add_data_prop(prop, label, comment, domain, range_):
         g_ont.add((prop, RDF.type, OWL.DatatypeProperty))
         g_ont.add((prop, RDFS.label, Literal(label)))
+        g_ont.add((prop, RDFS.comment, Literal(comment)))
         g_ont.add((prop, RDFS.domain, domain))
         g_ont.add((prop, RDFS.range, range_))
 
@@ -232,37 +262,86 @@ def build_ontology(g_ont: Graph) -> None:
               "AudioFeatures",
               "Audio analysis features extracted from a track")
 
+    add_class(MUSIC.AudioProfile,
+              "AudioProfile",
+              "A derived audio profile used to classify a track by listening characteristics",
+              subclass_of=MUSIC.AudioFeatures)
+
+    add_class(MUSIC.HighEnergyTrack,
+              "HighEnergyTrack",
+              "A track whose normalized energy score is at least 0.75",
+              subclass_of=MUSIC.Track)
+
+    add_class(MUSIC.PopularTrack,
+              "PopularTrack",
+              "A track whose popularity score is at least 70",
+              subclass_of=MUSIC.Track)
+
+    add_class(MUSIC.ReleaseEra,
+              "ReleaseEra",
+              "A temporal release grouping such as Classic Era, Transition Era, or Modern Era")
+
+    add_class(MUSIC.ModernTrack,
+              "ModernTrack",
+              "A track released from 2010 onward",
+              subclass_of=MUSIC.Track)
+
+    add_class(MUSIC.ClassicTrack,
+              "ClassicTrack",
+              "A track released before 2000",
+              subclass_of=MUSIC.Track)
+
+    for label, comment in [
+        ("Classic Era", "Release era for albums and tracks released before 2000"),
+        ("Transition Era", "Release era for albums and tracks released from 2000 through 2009"),
+        ("Modern Era", "Release era for albums and tracks released from 2010 onward"),
+    ]:
+        era = release_era_uri(label)
+        g_ont.add((era, RDF.type, MUSIC.ReleaseEra))
+        g_ont.add((era, RDFS.label, Literal(label)))
+        g_ont.add((era, RDFS.comment, Literal(comment)))
+
     # Object Properties
-    add_obj_prop(MUSIC.hasAlbum,    "hasAlbum",    MUSIC.Artist, MUSIC.Album)
-    add_obj_prop(MUSIC.hasTrack,    "hasTrack",    MUSIC.Album,  MUSIC.Track)
-    add_obj_prop(MUSIC.inGenre,     "inGenre",     MUSIC.Track,  MUSIC.Genre)
-    add_obj_prop(MUSIC.performedBy, "performedBy", MUSIC.Track,  MUSIC.Artist,
+    add_obj_prop(MUSIC.hasAlbum,    "hasAlbum",    "Links an artist to an album they released", MUSIC.Artist, MUSIC.Album)
+    add_obj_prop(MUSIC.hasTrack,    "hasTrack",    "Links an album to a track included on it", MUSIC.Album,  MUSIC.Track)
+    add_obj_prop(MUSIC.inGenre,     "inGenre",     "Links a track to its playlist or musical genre", MUSIC.Track,  MUSIC.Genre)
+    add_obj_prop(MUSIC.performedBy, "performedBy", "Links a track to the artist that performs it", MUSIC.Track,  MUSIC.Artist,
                  inverse_of=MUSIC.performs)
-    add_obj_prop(MUSIC.performs,    "performs",    MUSIC.Artist, MUSIC.Track)
+    add_obj_prop(MUSIC.performs,    "performs",    "Links an artist to a track they perform", MUSIC.Artist, MUSIC.Track,
+                 inverse_of=MUSIC.performedBy)
     add_obj_prop(MUSIC.hasAudioFeatures, "hasAudioFeatures",
-                 MUSIC.Track, MUSIC.AudioFeatures)
-    add_obj_prop(MUSIC.similarTo,   "similarTo",   MUSIC.Artist, MUSIC.Artist,
+                 "Links a track to its normalized Spotify audio-feature node", MUSIC.Track, MUSIC.AudioFeatures)
+    add_obj_prop(MUSIC.hasAudioProfile, "hasAudioProfile",
+                 "Links a track to a derived audio profile used for rule-based classification",
+                 MUSIC.Track, MUSIC.AudioProfile)
+    add_obj_prop(MUSIC.belongsToEra, "belongsToEra",
+                 "Links an album or track to a broad release era",
+                 RDFS.Resource, MUSIC.ReleaseEra)
+    add_obj_prop(MUSIC.similarTo,   "similarTo",   "Symmetric artist-to-artist similarity based on audio-feature averages", MUSIC.Artist, MUSIC.Artist,
                  symmetric=True)
 
     # sharedGenreWith (used in inference)
     g_ont.add((MUSIC.sharedGenreWith, RDF.type, OWL.ObjectProperty))
     g_ont.add((MUSIC.sharedGenreWith, RDFS.label, Literal("sharedGenreWith")))
+    g_ont.add((MUSIC.sharedGenreWith, RDFS.comment, Literal("Symmetric relation between tracks assigned to the same genre")))
     g_ont.add((MUSIC.sharedGenreWith, RDFS.domain, MUSIC.Track))
     g_ont.add((MUSIC.sharedGenreWith, RDFS.range,  MUSIC.Track))
     g_ont.add((MUSIC.sharedGenreWith, RDF.type, OWL.SymmetricProperty))
 
     # Datatype Properties
-    add_data_prop(MUSIC.trackName,   "trackName",   MUSIC.Track,          XSD.string)
-    add_data_prop(MUSIC.artistName,  "artistName",  MUSIC.Artist,         XSD.string)
-    add_data_prop(MUSIC.albumName,   "albumName",   MUSIC.Album,          XSD.string)
-    add_data_prop(MUSIC.releaseYear, "releaseYear", MUSIC.Album,          XSD.integer)
-    add_data_prop(MUSIC.tempo,       "tempo",       MUSIC.AudioFeatures,  XSD.float)
-    add_data_prop(MUSIC.energy,      "energy",      MUSIC.AudioFeatures,  XSD.float)
-    add_data_prop(MUSIC.danceability,"danceability",MUSIC.AudioFeatures,  XSD.float)
-    add_data_prop(MUSIC.valence,     "valence",     MUSIC.AudioFeatures,  XSD.float)
-    add_data_prop(MUSIC.loudness,    "loudness",    MUSIC.AudioFeatures,  XSD.float)
-    add_data_prop(MUSIC.popularity,  "popularity",  MUSIC.Track,          XSD.integer)
-    add_data_prop(MUSIC.durationMs,  "durationMs",  MUSIC.Track,          XSD.integer)
+    add_data_prop(MUSIC.trackName,   "trackName",   "Human-readable track title", MUSIC.Track,          XSD.string)
+    add_data_prop(MUSIC.artistName,  "artistName",  "Human-readable artist name", MUSIC.Artist,         XSD.string)
+    add_data_prop(MUSIC.albumName,   "albumName",   "Human-readable album name", MUSIC.Album,          XSD.string)
+    add_data_prop(MUSIC.releaseYear, "releaseYear", "Album release year extracted from Spotify metadata", MUSIC.Album,          XSD.integer)
+    add_data_prop(MUSIC.tempo,       "tempo",       "Normalized tempo value in the range 0 to 1", MUSIC.AudioFeatures,  XSD.float)
+    add_data_prop(MUSIC.energy,      "energy",      "Spotify energy score in the range 0 to 1", MUSIC.AudioFeatures,  XSD.float)
+    add_data_prop(MUSIC.danceability,"danceability","Spotify danceability score in the range 0 to 1", MUSIC.AudioFeatures,  XSD.float)
+    add_data_prop(MUSIC.valence,     "valence",     "Spotify valence score in the range 0 to 1", MUSIC.AudioFeatures,  XSD.float)
+    add_data_prop(MUSIC.loudness,    "loudness",    "Normalized loudness value in the range 0 to 1", MUSIC.AudioFeatures,  XSD.float)
+    add_data_prop(MUSIC.popularity,  "popularity",  "Spotify track popularity score from 0 to 100", MUSIC.Track,          XSD.integer)
+    add_data_prop(MUSIC.durationMs,  "durationMs",  "Track duration in milliseconds", MUSIC.Track,          XSD.integer)
+    add_data_prop(MUSIC.energyLevel, "energyLevel", "Derived low, medium, or high energy label", MUSIC.AudioProfile, XSD.string)
+    add_data_prop(MUSIC.popularityLevel, "popularityLevel", "Derived low, medium, or high popularity label", MUSIC.Track, XSD.string)
 
     log.info(f"  Ontology triples: {len(g_ont):,}")
 
@@ -333,6 +412,8 @@ def populate_graphs(
             g_albums.add((al_uri, MUSIC.albumName,   Literal(album_name, datatype=XSD.string)))
             g_albums.add((al_uri, MUSIC.releaseYear, Literal(year, datatype=XSD.integer)))
             g_albums.add((a_uri,  MUSIC.hasAlbum,    al_uri))
+            _, era_uri = release_era_for_year(year)
+            g_albums.add((al_uri, MUSIC.belongsToEra, era_uri))
 
         # Track graph
         g_tracks.add((t_uri, RDF.type,         MUSIC.Track))
@@ -340,15 +421,26 @@ def populate_graphs(
         g_tracks.add((t_uri, MUSIC.performedBy, a_uri))
         g_tracks.add((t_uri, MUSIC.inGenre,    g_uri))
         g_tracks.add((al_uri, MUSIC.hasTrack,  t_uri))
+        era_label, era_uri = release_era_for_year(year)
+        g_tracks.add((t_uri, MUSIC.belongsToEra, era_uri))
+        if era_label == "Modern Era":
+            g_tracks.add((t_uri, RDF.type, MUSIC.ModernTrack))
+        elif era_label == "Classic Era":
+            g_tracks.add((t_uri, RDF.type, MUSIC.ClassicTrack))
 
         pop = getattr(row, "popularity", 0) or 0
         dur = getattr(row, "duration_ms", 0) or 0
         g_tracks.add((t_uri, MUSIC.popularity, Literal(int(pop), datatype=XSD.integer)))
         g_tracks.add((t_uri, MUSIC.durationMs, Literal(int(dur), datatype=XSD.integer)))
+        g_tracks.add((t_uri, MUSIC.popularityLevel, Literal(popularity_level(int(pop)), datatype=XSD.string)))
+        if int(pop) >= 70:
+            g_tracks.add((t_uri, RDF.type, MUSIC.PopularTrack))
 
         # AudioFeatures
         g_tracks.add((t_uri,  MUSIC.hasAudioFeatures, af_uri))
+        g_tracks.add((t_uri,  MUSIC.hasAudioProfile, af_uri))
         g_tracks.add((af_uri, RDF.type, MUSIC.AudioFeatures))
+        g_tracks.add((af_uri, RDF.type, MUSIC.AudioProfile))
 
         tempo_norm = float(getattr(row, "tempo_norm", 0) or 0)
         energy     = float(getattr(row, "energy", 0) or 0)
@@ -362,6 +454,9 @@ def populate_graphs(
         g_tracks.add((af_uri, MUSIC.danceability, Literal(dance,      datatype=XSD.float)))
         g_tracks.add((af_uri, MUSIC.valence,      Literal(valence,    datatype=XSD.float)))
         g_tracks.add((af_uri, MUSIC.loudness,     Literal(loudness_n, datatype=XSD.float)))
+        g_tracks.add((af_uri, MUSIC.energyLevel,  Literal(energy_level(energy), datatype=XSD.string)))
+        if energy >= 0.75:
+            g_tracks.add((t_uri, RDF.type, MUSIC.HighEnergyTrack))
 
     log.info(f"Graph population complete. Artists={len(seen_artists):,}, "
              f"Albums={len(seen_albums):,}, Genres={len(seen_genres):,}")
