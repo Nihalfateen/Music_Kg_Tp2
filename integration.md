@@ -53,19 +53,26 @@ Current responsibilities:
 Current outputs:
 
 ```text
+music_kg_project/data/facts_only.nt
 music_kg_project/data/music_kg.nt
 music_kg_project/data/music_kg.rdf
+music_kg_project/data/music_kg_integrated.rdf
 music_kg_project/data/ontology.ttl
 music_kg_project/data/stats.json
 ```
 
-Required TP2 outputs still to add:
+Still to add in later milestones:
 
 ```text
-music_kg_project/data/facts_only.nt
-music_kg_project/data/music_kg_integrated.rdf
 music_kg_project/data/spin_rules.ttl
 ```
+
+Output meaning:
+
+- `facts_only.nt` contains data facts only from the artist, album, and track named graphs.
+- `ontology.ttl` contains ontology/schema triples only.
+- `music_kg_integrated.rdf` contains ontology plus facts in RDF/XML for Protégé.
+- `music_kg.nt` and `music_kg.rdf` are preserved full-graph exports for existing behavior.
 
 ### 3.2 Backend
 
@@ -126,9 +133,10 @@ music-kg
 - If GraphDB is not reachable:
   - loads `music_kg.nt` into an in-memory `rdflib.ConjunctiveGraph`.
 
-Important required fix:
+Dependency status:
 
-- `rdf_store.py` imports `requests`, but `music_kg_project/requirements.txt` currently does not include `requests`. Add it before running the backend on a fresh environment.
+- `requests` is included in `music_kg_project/requirements.txt` because `rdf_store.py` imports it.
+- `SPARQLWrapper` is included in both root and backend requirements for the later DBpedia/Wikidata enrichment milestone.
 
 ### 3.4 Frontend
 
@@ -261,16 +269,11 @@ Current root requirements:
 
 ```text
 rdflib
+SPARQLWrapper
 pandas
 numpy
 scipy
 tqdm
-```
-
-Future TP2 requirement:
-
-```text
-SPARQLWrapper
 ```
 
 ### 5.2 Backend Dependencies
@@ -287,17 +290,7 @@ Django
 djangorestframework
 django-cors-headers
 rdflib
-```
-
-Required fix:
-
-```text
 requests
-```
-
-Future TP2 requirement:
-
-```text
 SPARQLWrapper
 ```
 
@@ -309,20 +302,20 @@ From project root:
 python convert_to_rdf.py --csv spotify_songs.csv --data-dir music_kg_project/data/
 ```
 
-Current expected outputs:
+Expected outputs:
 
 ```text
+music_kg_project/data/facts_only.nt
 music_kg_project/data/music_kg.nt
 music_kg_project/data/music_kg.rdf
+music_kg_project/data/music_kg_integrated.rdf
 music_kg_project/data/ontology.ttl
 music_kg_project/data/stats.json
 ```
 
-Future expected outputs:
+Later milestone output:
 
 ```text
-music_kg_project/data/facts_only.nt
-music_kg_project/data/music_kg_integrated.rdf
 music_kg_project/data/spin_rules.ttl
 ```
 
@@ -402,14 +395,11 @@ For GraphDB validation, import in this order:
 2. `music_kg_project/data/ontology.ttl`
 3. `music_kg_project/data/spin_rules.ttl` after it is implemented
 
-Current limitation:
+Current note:
 
-- `facts_only.nt` and `spin_rules.ttl` are not generated yet.
-
-Current fallback:
-
-- Import `music_kg_project/data/music_kg.nt` to load the existing full graph.
-- Import `music_kg_project/data/ontology.ttl` separately if testing ontology behavior.
+- `facts_only.nt` is generated and excludes ontology/schema triples.
+- `spin_rules.ttl` is not generated yet and belongs to the later SPIN milestone.
+- `music_kg.nt` remains available as the existing full-graph import option.
 
 ### 6.4 Confirm GraphDB Use
 
@@ -430,13 +420,13 @@ Expected:
 
 Protégé should be used to validate the ontology and integrated data.
 
-Current file:
+Ontology-only file:
 
 ```text
 music_kg_project/data/ontology.ttl
 ```
 
-Future integrated file:
+Integrated ontology plus facts file:
 
 ```text
 music_kg_project/data/music_kg_integrated.rdf
@@ -447,7 +437,7 @@ Recommended workflow:
 1. Open Protégé.
 2. Load `ontology.ttl`.
 3. Check classes, properties, labels, domains, ranges, and restrictions.
-4. Load/open the integrated graph file after it is generated.
+4. Load/open `music_kg_integrated.rdf`.
 5. Run reasoner checks where applicable.
 6. Document results in `tp2_report.md`.
 
@@ -576,6 +566,14 @@ spin_rules.ttl
 stats.json
 ```
 
+Current generated TP2 files:
+
+```text
+facts_only.nt
+ontology.ttl
+music_kg_integrated.rdf
+```
+
 ### 11.2 RDF Parse Checks
 
 Use `rdflib` or command-line tools to confirm files parse and contain triples.
@@ -594,6 +592,14 @@ for path, fmt in [
     g.parse(path, format=fmt)
     print(path, len(g))
 PY
+```
+
+Latest verification results:
+
+```text
+music_kg_project/data/ontology.ttl: 101 triples
+music_kg_project/data/facts_only.nt: 569607 triples
+music_kg_project/data/music_kg_integrated.rdf: 569708 triples
 ```
 
 ### 11.3 Backend Checks
@@ -644,4 +650,3 @@ The report must follow this order:
 9. Configuration to run the application.
 
 Each implementation milestone should update the report or add notes that can be copied into it.
-

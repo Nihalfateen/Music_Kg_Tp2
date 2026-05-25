@@ -26,8 +26,10 @@ music_kg/
 │   ├── requirements.txt
 │   ├── db.sqlite3
 │   ├── data/
+│   │   ├── facts_only.nt
 │   │   ├── music_kg.nt
 │   │   ├── music_kg.rdf
+│   │   ├── music_kg_integrated.rdf
 │   │   ├── ontology.ttl
 │   │   └── stats.json
 │   ├── music_kg_project/
@@ -92,10 +94,14 @@ music_kg/
 
 - `convert_to_rdf.py` generates RDF graph files from `spotify_songs.csv`.
 - Current generated files:
+  - `music_kg_project/data/facts_only.nt`
   - `music_kg_project/data/music_kg.nt`
   - `music_kg_project/data/music_kg.rdf`
+  - `music_kg_project/data/music_kg_integrated.rdf`
   - `music_kg_project/data/ontology.ttl`
   - `music_kg_project/data/stats.json`
+- `facts_only.nt` is exported from the data named graphs only and excludes the ontology/schema graph.
+- `music_kg_integrated.rdf` is exported as ontology plus facts for Protégé validation.
 - Ontology includes core classes:
   - `music:Artist`
   - `music:Album`
@@ -142,10 +148,11 @@ The project must use GraphDB as the triplestore repository.
 Current status:
 
 - Partial. `rdf_store.py` contains GraphDB connection and fallback logic.
+- `requests` is now included in `music_kg_project/requirements.txt`.
+- `SPARQLWrapper` is now included in both root and backend requirements for later enrichment work.
 
 Required improvements:
 
-- Add missing dependency `requests` to `music_kg_project/requirements.txt`.
 - Document GraphDB setup and repository creation.
 - Confirm the Django app can query GraphDB when it is running.
 - Keep `rdflib` fallback as a developer convenience, but make GraphDB the documented TP2 path.
@@ -186,9 +193,14 @@ Required files:
 
 Current status:
 
-- Missing `facts_only.nt`.
-- Missing explicit `music_kg_integrated.*` filename.
-- Existing `music_kg.rdf` likely contains integrated graph, but it should be exported with a clear TP2 filename.
+- Done for Milestone 2.
+- `facts_only.nt` is generated as data-only N-Triples, excluding ontology/schema triples from the ontology named graph.
+- `music_kg_integrated.rdf` is generated as ontology plus facts in RDF/XML for Protégé.
+- Existing outputs `music_kg.nt`, `music_kg.rdf`, `ontology.ttl`, and `stats.json` are preserved.
+- Latest parse verification:
+  - `ontology.ttl`: 101 triples
+  - `facts_only.nt`: 569607 triples
+  - `music_kg_integrated.rdf`: 569708 triples
 
 ### 4.5 SPIN Inference Rules
 
@@ -224,11 +236,10 @@ The assignment requires programmatic access to DBpedia and/or Wikidata SPARQL en
 Current status:
 
 - Partial. DBpedia links are generated locally, but no endpoint access exists.
-- `SPARQLWrapper` is not in requirements.
+- `SPARQLWrapper` is now present in requirements, but live endpoint enrichment is not implemented yet.
 
 Required improvements:
 
-- Add `SPARQLWrapper` to the appropriate requirements file.
 - Create an enrichment module, for example:
   - `music_kg_project/music_graph/linked_data.py`
   - or `enrich_linked_data.py`
@@ -335,21 +346,21 @@ Recommended file:
 |---|---|---|
 | Python/Django app | Done | `music_kg_project/` exists with API views/routes. |
 | React UI | Done | `music-kg-frontend/` exists with multiple routed pages. |
-| RDF data | Done | `music_kg.nt`, `music_kg.rdf` exist. |
+| RDF data | Done | `music_kg.nt`, `music_kg.rdf`, `facts_only.nt`, and `music_kg_integrated.rdf` exist. |
 | RDFS/OWL ontology | Partial | `ontology.ttl` exists but needs expansion. |
 | SPARQL SELECT | Done | `/api/sparql/` exists. |
 | SPARQL UPDATE | Done/Partial | `/api/sparql/update/` exists; needs documentation/control. |
-| GraphDB | Partial | Code exists in `rdf_store.py`; dependency/docs/testing missing. |
-| Protégé workflow | Missing | No validation instructions yet. |
-| Facts-only RDF file | Missing | `facts_only.nt` does not exist. |
-| Integrated ontology+facts file | Partial | `music_kg.rdf` exists, but no explicit TP2 filename. |
+| GraphDB | Partial | Code exists in `rdf_store.py`; `requests` dependency added; docs/testing still needed. |
+| Protégé workflow | Partial | Integrated RDF/XML file exists; manual Protégé validation still needed. |
+| Facts-only RDF file | Done | `facts_only.nt` generated with 569607 triples and no ontology schema triples. |
+| Integrated ontology+facts file | Done | `music_kg_integrated.rdf` generated with 569708 triples. |
 | SPIN rules | Missing | Current inference is Python, not SPIN. |
-| SPARQLWrapper | Missing | Not in requirements or code. |
+| SPARQLWrapper | Partial | Dependency added; enrichment code still missing. |
 | DBpedia integration | Partial | `owl:sameAs` generated locally; no endpoint query. |
 | Wikidata integration | Missing | No evidence in code. |
 | RDFa/microformats | Missing | No semantic markup in React pages. |
 | TP2 report | Missing | No report file. |
-| TP2 checklist | Missing | No checklist file. |
+| TP2 checklist | Done | `tp2_checklist.md` documents status, generated files, regeneration, and parse checks. |
 
 ## 8. Milestones
 
@@ -359,11 +370,12 @@ Goal: establish the project roadmap and produce the first deliverable checklist.
 
 Tasks:
 
-- Keep `prd.md` updated as source of truth.
-- Keep `integration.md` updated as technical setup/integration guide.
-- Create `tp2_checklist.md`.
-- Add `requests` to backend requirements if GraphDB code uses it.
-- Document current status and exact missing TP2 items.
+- Done: `prd.md` updated as source of truth.
+- Done: `integration.md` updated as technical setup/integration guide.
+- Done: created `tp2_checklist.md`.
+- Done: added `requests` to backend requirements.
+- Done: added `SPARQLWrapper` to root and backend requirements.
+- Done: documented current status and exact remaining TP2 items.
 
 ### Milestone 2: RDF Deliverable Files
 
@@ -371,13 +383,14 @@ Goal: produce the required data files for GraphDB and Protégé.
 
 Tasks:
 
-- Update `convert_to_rdf.py` or add an export script.
-- Generate:
+- Done: updated `convert_to_rdf.py`.
+- Done: generated:
   - `facts_only.nt`
   - `ontology.ttl`
-  - `music_kg_integrated.rdf` or `.ttl`
-- Verify files contain triples.
-- Document generation commands.
+  - `music_kg_integrated.rdf`
+- Done: preserved existing `music_kg.nt`, `music_kg.rdf`, and `stats.json`.
+- Done: verified files parse and contain triples.
+- Done: documented generation and verification commands in `tp2_checklist.md`.
 
 ### Milestone 3: GraphDB Runtime
 
@@ -444,4 +457,3 @@ Tasks:
 - Run frontend build.
 - Verify GraphDB and Protégé instructions.
 - Verify required files exist.
-
