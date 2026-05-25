@@ -480,6 +480,7 @@ def compute_similarity(df: pd.DataFrame, g_artists: Graph) -> int:
 def serialize_graphs(
     cg: ConjunctiveGraph,
     g_ont: Graph,
+    fact_graphs: tuple[Graph, ...],
     stats: dict,
     data_dir: str,
 ) -> None:
@@ -490,6 +491,22 @@ def serialize_graphs(
 
     log.info("Serialising RDF/XML …")
     cg.serialize(destination=os.path.join(data_dir, "music_kg.rdf"), format="xml")
+
+    log.info("Serialising facts-only N-Triples …")
+    facts = Graph()
+    facts.bind("music", MUSIC)
+    facts.bind("schema", SCHEMA)
+    facts.bind("owl", OWL)
+    facts.bind("rdfs", RDFS)
+    facts.bind("xsd", XSD)
+    facts.bind("base", BASE)
+    for graph in fact_graphs:
+        for triple in graph:
+            facts.add(triple)
+    facts.serialize(destination=os.path.join(data_dir, "facts_only.nt"), format="nt")
+
+    log.info("Serialising integrated RDF/XML for Protégé …")
+    cg.serialize(destination=os.path.join(data_dir, "music_kg_integrated.rdf"), format="xml")
 
     log.info("Serialising Turtle ontology …")
     g_ont.serialize(destination=os.path.join(data_dir, "ontology.ttl"), format="turtle")
@@ -563,7 +580,7 @@ def main(csv_path: str = "spotify_songs.csv", data_dir: str = "data") -> None:
         log.info(f"  {k}: {v}")
 
     # ── Step 7 — Serialise ───────────────────
-    serialize_graphs(cg, g_ont, stats, data_dir)
+    serialize_graphs(cg, g_ont, (g_artists, g_albums, g_tracks), stats, data_dir)
 
     elapsed = time.time() - t0
     log.info(f"\nDone in {elapsed:.1f}s  ({elapsed/60:.2f} min)")
