@@ -21,6 +21,7 @@ from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import OWL, RDF, RDFS, XSD
 from SPARQLWrapper import JSON, SPARQLWrapper
 
+from music_graph.rdf_store import store
 
 BASE = Namespace("http://musickg.org/")
 MUSIC = Namespace("http://musickg.org/ontology#")
@@ -234,6 +235,19 @@ def enrich(
             stats.enriched_resources += 1
             stats.triples_added += added
 
+            abstract = first_binding_value(binding, "abstract")
+
+            if abstract:
+                safe_abstract = abstract.replace("" , "").replace('\\', '')
+
+                update_query = f"""
+                PREFIX music: <http://musickg.org/ontology#>
+                INSERT DATA {{
+                    <{candidate.local_uri}> music:dbpediaAbstract "{safe_abstract}"@en .
+                }}
+                """
+                store.execute_sparql_update(update_query)
+
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
     enrichment.serialize(destination=output_path, format="turtle")
 
@@ -290,6 +304,55 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     )
     return parser.parse_args(argv)
 
+
+def fetch_and_save_dbpedia_data(artist_uri, dbpedia_uri):
+    """
+    Fetches the abstract from DBpedia and saves it directly to GraphDB.
+    Triggered dynamically when a user visits an artist profile.
+    """
+    # Clean the URIs to ensure they don't have double brackets
+    clean_dbpedia_uri = dbpedia_uri.strip("<>")
+    clean_artist_uri = artist_uri.strip("<>")
+
+    sparql = SPARQLWrapper("http://dbpedia.org/sparql")
+
+    # Query DBpedia specifically for the English abstract
+    query = f"""
+    PREFIX dbo: <http://dbpedia.org/ontology/>
+    SELECT ?abstract WHERE {{
+        <{clean_dbpedia_uri}> dbo:abstract ?abstract .
+        FILTER (lang(?abstract) = 'en')
+    }} LIMIT 1
+    """
+
+    sparql.setQuery(query)
+    sparql.setReturnFormat(JSON)
+
+    try:
+        results = sparql.query().convert()
+        bindings = results["results"]["bindings"]
+
+        if bindings:
+            abstract_text = bindings[0]["abstract"]["value"]
+
+            # Clean the text so quotes don't break our GraphDB query
+            safe_abstract = abstract_text.replace('"', "'").replace('\\', '')
+
+            # Insert the newly discovered data permanently into GraphDB
+            update_query = f"""
+            PREFIX music: <http://musickg.org/ontology#>
+            INSERT DATA {{
+                <{clean_artist_uri}> music:dbpediaAbstract "{safe_abstract}"@en .
+            }}
+            """
+            store.execute_sparql_update(update_query)
+            print(f"Success: Enriched {clean_artist_uri} with DBpedia abstract.")
+            return True
+
+    except Exception as e:
+        print(f"Error fetching DBpedia data for {clean_artist_uri}: {e}")
+
+    return Falses
 
 def main(argv: Iterable[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")

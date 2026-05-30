@@ -33,8 +33,8 @@ export const getArtistDetail = (slug) => api.get(`/artists/${encodeURIComponent(
 export const getAlbumDetail = (slug) => api.get(`/albums/${encodeURIComponent(slug)}/`, { params: { _t: Date.now() }});
 export const getTracks         = (params)     => api.get('/tracks/', { params })
 export const searchAll         = (q, params)  => api.get('/search/', { params: { q, ...params } })
-export const getTimeline       = (params)     => api.get('/timeline/', { params })
-export const getGenreEvolution = (genre)      => api.get(`/timeline/${encodeURIComponent(genre)}/`)
+export const getTimeline       = (params)     => api.get('/timeline/', { params: { ...params, _t: Date.now() } })
+export const getGenreEvolution = (genre)      => api.get(`/timeline/${encodeURIComponent(genre)}/`, { params: { _t: Date.now() } })
 export const getGenreLandscape = ()           => api.get('/genre-landscape/')
 export const getAudioDistribution = ()        => api.get('/audio-distribution/')
 export const getRecommendations   = (slug)    => api.get(`/recommendations/${encodeURIComponent(slug)}/`)

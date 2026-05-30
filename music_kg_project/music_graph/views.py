@@ -25,7 +25,7 @@ from music_graph.models import SearchLog, SPARQLQueryTemplate
 from music_graph.rdf_store import store
 from music_graph.similarity import get_recommendations, engine_stats
 from music_graph.serializers import SPARQLQueryTemplateSerializer
-
+from music_graph.linked_data import fetch_and_save_dbpedia_data
 from music_graph.sparql_queries import create_artist_node
 from music_graph.sparql_queries import create_songs_bulk
 from music_graph.sparql_queries import update_track_album
@@ -106,6 +106,14 @@ class ArtistDetailView(APIView):
                 {"error": f"Artist '{slug}' not found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+        if data.get("dbpedia_uri") and not data.get("dbpedia_abstract"):
+            try:
+                # This calls the function we edited in the last step!
+                fetch_and_save_dbpedia_data(data["uri"], data["dbpedia_uri"])
+                # Re-fetch the data so the new abstract is included in the response
+                data = get_artist_detail(slug)
+            except Exception as e:
+                print(f"Failed to enrich from DBpedia: {e}")
         return _timed_response(detail, t0)
 
 

@@ -163,6 +163,19 @@ def get_artist_detail(artist: str) -> Optional[Dict]:
 
     name = str(basic[0]["name"])
 
+    inferred_q = _PREFIXES + f"""
+    SELECT DISTINCT ?type WHERE {{
+        {artist_ref} a ?type .
+        FILTER(?type != music:Artist)
+        FILTER(?type != owl:NamedIndividual)
+        FILTER(STRSTARTS(STR(?type), "http://musickg.org/ontology#"))
+    }}
+    """
+
+    inferred_classes = [
+        str(r["type"]).split("#")[-1]
+        for r in store.execute_sparql(inferred_q)
+    ]
     # Genres
     genre_q = _PREFIXES + f"""
     SELECT DISTINCT ?genreLabel WHERE {{
@@ -286,6 +299,7 @@ def get_artist_detail(artist: str) -> Optional[Dict]:
         "uri":             f"http://musickg.org/artist/{artist_slug}",
         "slug":            artist_slug,
         "name":            name,
+        "inferred_classes": inferred_classes,
         "genres":          genres,
         "dbpedia_uri":     dbpedia,
         "albums":          albums,

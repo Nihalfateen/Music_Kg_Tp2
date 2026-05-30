@@ -235,16 +235,38 @@ export default function ArtistDetailPage() {
 
   useEffect(() => {
     setLoading(true)
+
+    const enrichmentTimer = setTimeout(() => {
+      toast.loading("Fetching latest data from DBpedia...", {
+        id: "dbpedia-fetch",
+        style: {
+          background: '#333',
+          color: '#fff',
+          border: '1px solid #1db954'
+        }
+      })
+    }, 800)
+
     Promise.all([
       getArtistDetail(slug),
       getRecommendations(slug).catch(() => ({ data: { similar_artists: [], recommended_tracks: [] } })),
     ])
       .then(([artRes, recRes]) => {
+        clearTimeout(enrichmentTimer)
         setArtist(artRes.data)
         setRecs(recRes.data)
       })
-      .catch(() => toast.error('Failed to load artist'))
+      .catch(() => {
+        clearTimeout(enrichmentTimer)
+        toast.dismiss("dbpedia-fetch")
+        toast.error('Failed to load artist')
+      })
       .finally(() => setLoading(false))
+
+    return () => {
+      clearTimeout(enrichmentTimer)
+      toast.dismiss("dbpedia-fetch")
+    }
   }, [slug])
 
   const handleUpdateAlbum = async () => {
@@ -351,6 +373,15 @@ export default function ArtistDetailPage() {
                     style={{ background: hashColor(g) + '33', color: hashColor(g) }}>
                     {g}
                   </Link>
+                ))}
+                {artist.inferred_classes && artist.inferred_classes.map(infClass => (
+                  <span
+                    key={infClass}
+                    className="px-3 py-1 bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 text-xs uppercase tracking-wider font-bold rounded-full shadow-[0_0_8px_rgba(234,179,8,0.3)] flex items-center gap-1"
+                    title="Automatically inferred by Ontology Rules"
+                  >
+                    ✨ {infClass.replace(/([A-Z])/g, ' $1').trim()} {/* Adds spaces to CamelCase */}
+                  </span>
                 ))}
               </div>
 
