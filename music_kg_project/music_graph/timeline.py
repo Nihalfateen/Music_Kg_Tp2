@@ -5,10 +5,181 @@ Timeline and genre-evolution queries.
 """
 import logging
 from typing import List, Dict
+from rdflib import Namespace
+from rdflib.namespace import RDF, RDFS
+
 from music_graph.rdf_store import store
 from music_graph.sparql_queries import _PREFIXES, _round
 
 log = logging.getLogger(__name__)
+MUSIC = Namespace("http://musickg.org/ontology#")
+
+
+def _as_int(value, default=0) -> int:
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return default
+
+
+def _as_float(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _local_graph():
+    return getattr(store, "_graph", None)
+
+
+def _get_audio_features(graph, track):
+    feature_node = graph.value(track, MUSIC.hasAudioFeatures)
+    if not feature_node:
+        return {}
+    return {
+        "energy": _as_float(graph.value(feature_node, MUSIC.energy)),
+        "danceability": _as_float(graph.value(feature_node, MUSIC.danceability)),
+        "valence": _as_float(graph.value(feature_node, MUSIC.valence)),
+    }
+
+
+def _get_label(graph, subject) -> str | None:
+    value = graph.value(subject, RDFS.label)
+    return str(value) if value is not None else None
+
+
+def _fallback_timeline_data(start_year: int, end_year: int) -> List[Dict]:
+    graph = _local_graph()
+    if not graph:
+        return []
+
+    years: dict[int, dict] = {}
+    for album, _, year_value in graph.triples((None, MUSIC.releaseYear, None)):
+        year = _as_int(year_value, None)
+        if year is None or year < start_year or year > end_year:
+            continue
+
+        row = years.setdefault(
+            year,
+            {
+                "tracks": set(),
+                "artists": set(),
+                "genres": {},
+                "features": {"energy": [], "danceability": []},
+                "top_tracks": [],
+            },
+        )
+
+        for track in graph.objects(album, MUSIC.hasTrack):
+            row["tracks"].add(track)
+
+            artist = graph.value(track, MUSIC.performedBy)
+            if artist:
+                row["artists"].add(artist)
+
+            genre = graph.value(track, MUSIC.inGenre)
+            if genre:
+                label = _get_label(graph, genre) or str(genre).rstrip("/").split("/")[-1]
+                row["genres"][label] = row["genres"].get(label, 0) + 1
+
+            features = _get_audio_features(graph, track)
+            for key in ("energy", "danceability"):
+                if features.get(key) is not None:
+                    row["features"][key].append(features[key])
+
+            name = graph.value(track, MUSIC.trackName)
+            popularity = _as_int(graph.value(track, MUSIC.popularity), 0)
+            artist_name = graph.value(artist, MUSIC.artistName) if artist else None
+            if name:
+                row["top_tracks"].append(
+                    {
+                        "name": str(name),
+                        "artist": str(artist_name) if artist_name else "Unknown",
+                        "popularity": popularity,
+                    }
+                )
+
+    timeline = []
+    for year in sorted(years):
+        row = years[year]
+        top_genre = None
+        if row["genres"]:
+            top_genre = max(row["genres"].items(), key=lambda item: item[1])[0]
+
+        energy_values = row["features"]["energy"]
+        dance_values = row["features"]["danceability"]
+        top_tracks = sorted(
+            row["top_tracks"],
+            key=lambda track: track.get("popularity", 0),
+            reverse=True,
+        )[:3]
+
+        timeline.append(
+            {
+                "year": year,
+                "track_count": len(row["tracks"]),
+                "artist_count": len(row["artists"]),
+                "top_genre": top_genre,
+                "avg_energy": round(sum(energy_values) / len(energy_values), 4) if energy_values else None,
+                "avg_danceability": round(sum(dance_values) / len(dance_values), 4) if dance_values else None,
+                "top_tracks": top_tracks,
+            }
+        )
+    return timeline
+
+
+def _fallback_genre_evolution(genre_name: str) -> List[Dict]:
+    graph = _local_graph()
+    if not graph:
+        return []
+
+    target = genre_name.strip().lower()
+    genre_nodes = [
+        genre
+        for genre in graph.subjects(RDF.type, MUSIC.Genre)
+        if (_get_label(graph, genre) or str(genre).rstrip("/").split("/")[-1]).lower() == target
+    ]
+    if not genre_nodes:
+        return []
+
+    decades: dict[int, dict] = {}
+    for genre in genre_nodes:
+        for track in graph.subjects(MUSIC.inGenre, genre):
+            album = graph.value(predicate=MUSIC.hasTrack, object=track)
+            year = _as_int(graph.value(album, MUSIC.releaseYear) if album else None, None)
+            if year is None or year < 1950 or year > 2024:
+                continue
+
+            decade = (year // 10) * 10
+            row = decades.setdefault(
+                decade,
+                {
+                    "tracks": set(),
+                    "energy": [],
+                    "danceability": [],
+                    "valence": [],
+                },
+            )
+            row["tracks"].add(track)
+            features = _get_audio_features(graph, track)
+            for key in ("energy", "danceability", "valence"):
+                if features.get(key) is not None:
+                    row[key].append(features[key])
+
+    result = []
+    for decade in sorted(decades):
+        row = decades[decade]
+        result.append(
+            {
+                "decade": decade,
+                "track_count": len(row["tracks"]),
+                "avg_energy": round(sum(row["energy"]) / len(row["energy"]), 4) if row["energy"] else None,
+                "avg_danceability": round(sum(row["danceability"]) / len(row["danceability"]), 4) if row["danceability"] else None,
+                "avg_valence": round(sum(row["valence"]) / len(row["valence"]), 4) if row["valence"] else None,
+            }
+        )
+    return result
 
 
 def get_timeline_data(start_year: int = 1950, end_year: int = 2024) -> List[Dict]:
@@ -16,6 +187,9 @@ def get_timeline_data(start_year: int = 1950, end_year: int = 2024) -> List[Dict
     Per-year aggregate: track count, artist count, top genre,
     avg audio features, top tracks by popularity.
     """
+    if not store.using_graphdb:
+        return _fallback_timeline_data(start_year, end_year)
+
     # Step 1 — per-year aggregates
     agg_q = _PREFIXES + f"""
     SELECT ?year
@@ -111,6 +285,9 @@ def get_genre_evolution(genre_name: str) -> List[Dict]:
     How a genre's audio features changed by decade.
     Returns [{decade, avg_energy, avg_danceability, avg_valence, track_count}]
     """
+    if not store.using_graphdb:
+        return _fallback_genre_evolution(genre_name)
+
     safe_genre = genre_name.replace('"', '\\"')
 
     query = _PREFIXES + f"""
